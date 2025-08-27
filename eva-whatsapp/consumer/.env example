@@ -1,0 +1,14 @@
+WHATSAPP_TOKEN=EAAIsyarofIYBO0VBDLxlps5By8HCusJmWwQuw90VrFz13gA5rDW86d8wEFRvoFdRIeNSx1nipnnE208S1StjhdsVIYFL1kD0i6zO7ObiN1PcIAASk3rGgylcmeaLZBT2TRFqpPDj3Lwdlprs6PnTqpJb833You1T4F62ZBSZADlEUlImwbMWpE0tTIRbBL77AZDZD
+WHATSAPP_WEBHOOK_TOKEN=my-test-token
+PORT=8000
+EVA_CLIENT_ID=6f146ae5-c0a6-4d75-987a-382b79e17d3d
+EVA_PASSWORD=05e360bb17588f986e7cb0
+EVA_HOST=https://env1.evamotor.com.br
+EVA_BOT_TEMPERATURE=0.1
+EVA_BOT_SEARCH_DOCS=true
+EVA_BOT_ENGINE=openai
+EVA_BOT_CL=1
+EVA_EXPIRED_SESSION_MESSAGE="Finalizando sessão, obrigado!"
+EVA_GREETING_MESSAGE="Se apresente de maneira informal para o usuário falando sobre é um assistente virtual especializado da empresa e irá ajudá-lo"
+SESSION_TIMEOUT_IN_MS=600000
+EVA_REPLY_AUDIO_TYPE=audio

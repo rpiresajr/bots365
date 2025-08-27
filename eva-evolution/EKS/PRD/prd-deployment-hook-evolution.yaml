@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: evolution-hook
+  name: evolution-hook-deployment
+  namespace: prd
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: evolution-hook
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: evolution-hook
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: evolution-hook-env
+        image: rparaujo/webhook-evolution:0.0.2
+        imagePullPolicy: Always
+        name: evolution-hook
+        ports:
+        - containerPort: 8898
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

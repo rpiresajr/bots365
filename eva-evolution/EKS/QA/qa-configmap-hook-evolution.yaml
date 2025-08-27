@@ -1,0 +1,16 @@
+apiVersion: v1
+data:
+  ASK_BASE_URL: https://apiqa.evamotor.com.br/v1
+  CASSANDRA_HOST: cassandra-hs.qa-base
+  CASSANDRA_KEYSPACE: eva_env1
+  CASSANDRA_NAME: datacenter1
+  CASSANDRA_PASSWORD: cassandra
+  CASSANDRA_USERNAME: cassandra
+  DB_PORT: "9042"
+  EVOLUTION_APIKEY: w6wyAumFzpMuIkdWo1Mgpz5LWpN
+  PORT: "8898"
+  SEND_MSG_URL: https://ev-qa.evamotor.com.br/message/sendText
+kind: ConfigMap
+metadata:
+  name: evolution-hook-env
+  namespace: qa

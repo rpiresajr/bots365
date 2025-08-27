@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: evolution-hook
+  name: evolution-hook-service
+  namespace: qa
+spec:
+  internalTrafficPolicy: Cluster
+  ports:
+  - name: http
+    port: 8898
+    protocol: TCP
+    targetPort: 8898
+  selector:
+    app: evolution-hook
+  type: ClusterIP
