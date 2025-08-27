@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
+const cassandra = require('cassandra-driver');
 const logger = require('./logger');
 const fs = require('fs');
 const FormData = require('form-data');
@@ -19,34 +20,25 @@ const MessageType = Object.freeze({
   TEXT: 'conversation',
 });
 
-let token_api;
+logger.info(`⏳ Conectando ao Cassandra...`);
+const cassandraClient = new cassandra.Client({
+  contactPoints: [process.env.CASSANDRA_HOST],
+  localDataCenter: process.env.CASSANDRA_NAME,
+  keyspace: process.env.CASSANDRA_KEYSPACE,
+  protocolOptions: { port: parseInt(process.env.DB_PORT, 10) },
+  authProvider: new cassandra.auth.PlainTextAuthProvider(
+    process.env.CASSANDRA_USERNAME,
+    process.env.CASSANDRA_PASSWORD
+  ),
+});
 
-async function getToken() {
-  const login = `${process.env.API_USERNAME}`;
-  const password = `${process.env.API_PASSWORD}`;
-
-  const res = await fetch(`${process.env.API_BASE_URL}/api/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login, password }),
+cassandraClient
+  .connect()
+  .then(() => logger.info(`✅ Conectado ao Cassandra com sucesso.`))
+  .catch((err) => {
+    console.error('❌ Erro ao conectar ao Cassandra:', err.message);
+    process.exit(1);
   });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Falha no login (${res.status} ${res.statusText}): ${body}`);
-  }
-
-  const data = await res.json().catch(() => ({}));
-  logger.info("retornando ....");
-  logger.info(data);
-  const token = typeof data?.token === 'string' ? data.token : null;
-  if (!token) throw new Error('Resposta não contém "message" com o token.');
-  
-  return token; // <- exatamente no formato { token: "xxxx" }
-}
-
-
-
 
 app.use(bodyParser.json());
 
@@ -73,19 +65,12 @@ async function sendWhatsappMessage(number, instance, text) {
 }
 
 async function sendWhatsappAudioMessage(number, instance, text, keyspace, token) {
-  //let token_api;
-  try {
-    token_api = await getToken();
-    logger.info({ token_api });
-  } catch (err) {
-    logger.error(err);
-  }
   const response = await axios({
     method: 'POST',
-    url: `${process.env.API_BASE_URL}/api/speech/from-text`,
+    url: `${process.env.API_BASE_URL}/${keyspace}/speech/from-text`,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token_api}`,
+      Authorization: `Bearer ${token}`,
     },
     data: {
       text,
@@ -145,13 +130,27 @@ async function getEnvironmentSettings(instance) {
   logger.info(
     `🔎 Buscando settings para environment: ${environmentName} e keyspace: ${keyspaceName}`
   );
+  const query = `SELECT settings FROM environments WHERE name = ? ALLOW FILTERING`;
+  const result = await cassandraClient.execute(query, [environmentName], {
+    prepare: true,
+  });
 
+  if (result.rows.length === 0) {
+    throw new Error(`Nenhum environment encontrado para ${environmentName}`);
+  }
 
+  const rawSettings = result.rows[0].settings;
 
-  let parsedSettings = {
-        "whatsapp_webhook_token": process.env.EVOLUTION_APIKEY,
-	"clientId": process.env.EVOLUTION_INSTANCE
-   }
+  logger.info(`🧪 Conteúdo de settings:`, rawSettings);
+
+  let parsedSettings;
+  if (typeof rawSettings === 'string') {
+    parsedSettings = JSON.parse(rawSettings.replace(/'/g, '"'));
+  } else if (typeof rawSettings === 'object' && rawSettings !== null) {
+    parsedSettings = rawSettings;
+  } else {
+    throw new Error('Formato inesperado em settings do environment');
+  }
 
   logger.info(
     `✅ Settings carregados para ${environmentName}:`,
@@ -195,19 +194,11 @@ async function getTextFromAudioFile(audioFilePath, token, keyspace) {
     formData.append('audio', fs.createReadStream(audioFilePath));
     formData.append('language', 'pt_BR');
 
-    //let token_api;
-    try {
-      token_api = await getToken();
-      logger.info({ token_api });
-    } catch (err) {
-      logger.error(err);
-    }
-
     const evaResponse = await axios({
       method: 'POST',
-      url: `${process.env.API_BASE_URL}/api/speech/from-audio`,
+      url: `${process.env.API_BASE_URL}/${keyspace}/speech/from-audio`,
       headers: {
-        Authorization: `Bearer ${token_api}`,
+        Authorization: `Bearer ${token}`,
         ...formData.getHeaders(),
       },
       data: formData,
@@ -281,8 +272,6 @@ app.use(async (req, res, next) => {
         searchdocs: false,
         temperature: 0.9,
         template,
-	email: false,
-	zendesk: false,
         client_id: clientId,
         sessionid: '',
         username: `WHATSAPP {{${number}}}`,
@@ -301,26 +290,18 @@ app.use(async (req, res, next) => {
         zendesk: false,
         sessionid,
         username: `WHATSAPP {{${number}}}`,
-        cl: '1',
+        cl: '2',
         engine: 'azure',
       };
       logger.info(`💬 Mensagem de sequência. Template: ${template}`);
     }
 
-    const askUrl = `${process.env.API_BASE_URL}/api/ai/ask`;
+    const askUrl = `${process.env.API_BASE_URL}/${keyspace}/ai/ask`;
     logger.info(`📡 Enviando para: ${askUrl}`);
-    logger.info(`📦 Payload:`, JSON.stringify(payload));
-    
-    //let token_api;
-    try {
-      token_api = await getToken();
-      logger.info({ token_api });
-    } catch (err) {
-      logger.error(err);
-    }
+    logger.info(`📦 Payload:`, payload);
 
     const askResponse = await axios.post(askUrl, payload, {
-      headers: { Authorization: `Bearer ${token_api}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     const botMessage = askResponse.data?.message || 'Não entendi sua pergunta.';

@@ -22,13 +22,13 @@ const MessageType = Object.freeze({
 let token_api;
 
 async function getToken() {
-  const login = `${process.env.API_USERNAME}`;
+  const clientId = `${process.env.API_USERNAME}`;
   const password = `${process.env.API_PASSWORD}`;
 
   const res = await fetch(`${process.env.API_BASE_URL}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login, password }),
+    body: JSON.stringify({ client_id: clientId, password }),
   });
 
   if (!res.ok) {
@@ -37,11 +37,9 @@ async function getToken() {
   }
 
   const data = await res.json().catch(() => ({}));
-  logger.info("retornando ....");
-  logger.info(data);
-  const token = typeof data?.token === 'string' ? data.token : null;
+  const token = typeof data?.message === 'string' ? data.message : null;
   if (!token) throw new Error('Resposta não contém "message" com o token.');
-  
+
   return token; // <- exatamente no formato { token: "xxxx" }
 }
 
