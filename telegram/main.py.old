@@ -64,9 +64,9 @@ def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=N
     
     if api_token is None:
         login_to_api()
-        message = "Desculpe, não foi possível autenticar com o BOT365 no momento."
+        message = "Desculpe, não foi possível autenticar com o E.V.A. no momento."
         if API_LANGUAGE != 'pt':
-            message= "Sorry, we were unable to authenticate with BOT365 at the moment."
+            message= "Sorry, we were unable to authenticate with E.V.A. at the moment."
         if api_token is None:
             return message
 
@@ -85,9 +85,9 @@ def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=N
         'cl': CL,
     }
     
-    message = "Desculpe, ocorreu um erro ao consultar o BOT365"
+    message = "Desculpe, ocorreu um erro ao consultar o E.V.A."
     if API_LANGUAGE != 'pt':
-        message = "Sorry, an error occurred when querying the BOT365"
+        message = "Sorry, an error occurred when querying the E.V.A."
     try:
         headers = {'Authorization': f'Bearer {api_token}'}
         response = requests.post(f'{API_QUERY_URL}', data=json.dumps(body), headers=headers)
@@ -139,11 +139,11 @@ def login_to_api():
     global api_token, last_login_time
     try:
         response = requests.post(API_LOGIN_URL, json={
-            'login': API_USERNAME,
+            'client_id': API_USERNAME,
             'password': API_PASSWORD
         })
         response.raise_for_status()
-        api_token = response.json()['token']
+        api_token = response.json()['message']
         last_login_time = time.time()
         print("Login na API bem-sucedido")
     except requests.RequestException as e:
