@@ -18,6 +18,7 @@ load_dotenv(find_dotenv())
 TOKEN = os.environ.get('TOKEN')
 API_BASE_URL = f"{os.environ.get('API_BASE_URL')}/api"
 API_LOGIN_URL = f'{API_BASE_URL}/login'
+API_WORKSPACE_URL = f'{API_BASE_URL}/workspace'
 API_QUERY_URL = f'{API_BASE_URL}/ai/ask'
 API_USERNAME = os.environ.get('API_USERNAME')
 API_PASSWORD = os.environ.get('API_PASSWORD')
@@ -30,6 +31,7 @@ API_SPEECH_TEXT_URL = f'{API_BASE_URL}/speech/from-text'
 API_LANGUAGE = os.environ.get('API_LANGUAGE')
 
 api_token = None
+frontend_workspace = None
 user_sessions = defaultdict(dict)
 application = None
 last_login_time = 0
@@ -60,7 +62,7 @@ async def start(update: Update, context):
     await update.message.reply_text(message)
     
 def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=None, user_name=None):
-    global api_token
+    global api_token, frontend_workspace
     
     if api_token is None:
         login_to_api()
@@ -69,6 +71,12 @@ def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=N
             message= "Sorry, we were unable to authenticate with BOT365 at the moment."
         if api_token is None:
             return message
+
+    TEMPERATURE="0.2"
+    if frontend_workspace is not None:
+        TEMPERATURE=float(frontend_workspace['temperature'])
+
+    print(f'Usando a temperatura ${TEMPERATURE}')
 
     body = {
         'query': input,
@@ -100,6 +108,7 @@ def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=N
     return reply['message']
 
 def new_session(session_id, user_name, user_id):
+    global frontend_workspace
     session_id = get_or_create_session(user_id)
     msg1="Se apresente de maneira informal para o usuário falando sobre é um assistente virtual especializado da empresa e irá ajudá-lo"
     msg2='{"role": "system", "content": "Você é um representante comercial querendo vender um produto ou um serviço. Lembre todas as perguntas que o humano fizer"}'
@@ -108,6 +117,12 @@ def new_session(session_id, user_name, user_id):
         msg1="Introduce yourself informally to the user by talking about the company's specialized virtual assistant and will help you"
         msg2='{"role": "system", "content": "You are a sales representative wanting to sell a product or service. Remember all the questions the human asks"}'
         msg3="Sorry, an error occurred when querying the API"
+    
+    memoria=None
+    if frontend_workspace is not None:
+        memoria = frontend_workspace['memory_saudacao']
+        msg2=f'{"role": "system", "content": "${memoria}"}'
+
     body = {
         'query':
           msg1,
@@ -133,7 +148,23 @@ def new_session(session_id, user_name, user_id):
     except requests.RequestException as e:
         reply = {"message": f"{msg3}: {str(e)}"}
     
+    print(f'Saudacao_memoria : ${memoria}')
+    
     return reply['message']
+
+
+def getFrontend():
+    global api_token, frontend_workspace
+    try:
+        headers = {'Authorization': f'Bearer {api_token}'}
+        response = requests.post(f'{API_WORKSPACE_URL}', headers=headers)
+        response.raise_for_status()
+        frontend_workspace = response.json()['frontend']
+        last_login_time = time.time()
+        print("Informacoes do Frontend coletadas com sucesso")
+    except requests.RequestException as e:
+        print(f"Erro ao trazer os dados do frontend: {str(e)}")
+        frontend_workspace = None
 
 def login_to_api():
     global api_token, last_login_time

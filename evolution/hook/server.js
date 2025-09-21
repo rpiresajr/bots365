@@ -21,6 +21,31 @@ const MessageType = Object.freeze({
 
 let token_api;
 
+
+async function getFrontEnd(token_api) {
+
+  const res = await fetch(`${process.env.API_BASE_URL}/api/workspace`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',
+               'Authorization': `Bearer ${token_api}` }
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Falha ao buscar info do workspace (${res.status} ${res.statusText})`);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  logger.info("retornando ....");
+  logger.info(data);
+  const frontend = data?.frontend ?? null;
+  if (!frontend) throw new Error('Resposta não contém o objeto frontend.');
+  
+  return frontend; // <- exatamente no formato { token: "xxxx" }
+}
+
+
+
 async function getToken() {
   const login = `${process.env.API_USERNAME}`;
   const password = `${process.env.API_PASSWORD}`;
@@ -44,9 +69,6 @@ async function getToken() {
   
   return token; // <- exatamente no formato { token: "xxxx" }
 }
-
-
-
 
 app.use(bodyParser.json());
 
@@ -267,50 +289,6 @@ app.use(async (req, res, next) => {
     const isFirstMessage = !sessionMap.has(number);
     const sessionid = sessionMap.get(number) || '';
 
-    let payload, template;
-
-    if (isFirstMessage) {
-      template = 'template_saudacao';
-      payload = {
-        memory: JSON.stringify({
-          role: 'system',
-          content:
-            'Você é um representante comercial querendo vender um produto ou uma franquia.',
-        }),
-        query: message,
-        searchdocs: false,
-        temperature: 0.9,
-        template,
-	email: false,
-	zendesk: false,
-        client_id: clientId,
-        sessionid: '',
-        username: `WHATSAPP {{${number}}}`,
-      };
-      logger.info(`👋 Primeira mensagem recebida. Template: ${template}`);
-    } else {
-      template = 'template_contexto';
-      payload = {
-        query: message,
-        memory: '{}',
-        searchdocs: true,
-        temperature: '0.2',
-        template,
-        client_id: clientId,
-        email: false,
-        zendesk: false,
-        sessionid,
-        username: `WHATSAPP {{${number}}}`,
-        cl: '1',
-        engine: 'azure',
-      };
-      logger.info(`💬 Mensagem de sequência. Template: ${template}`);
-    }
-
-    const askUrl = `${process.env.API_BASE_URL}/api/ai/ask`;
-    logger.info(`📡 Enviando para: ${askUrl}`);
-    logger.info(`📦 Payload:`, JSON.stringify(payload));
-    
     //let token_api;
     try {
       token_api = await getToken();
@@ -318,6 +296,57 @@ app.use(async (req, res, next) => {
     } catch (err) {
       logger.error(err);
     }
+
+    let payload, template;
+
+    const frontend = getFrontEnd(token_api);
+
+    if (isFirstMessage) {
+
+      const memory_saudacao = typeof frontend?.memory_saudacao === 'string' ? data.memory_saudacao : 'Você é um chatbot, conversando como um humano, de forma amigável. Nunca coloque a frase de saudação em negrito.';
+
+      template = 'template_saudacao';
+      payload = {
+        memory: JSON.stringify({
+          role: 'system',
+          content:
+            memory_saudacao,
+        }),
+        query: message,
+        searchdocs: false,
+        temperature: 0.9,
+        template,
+	      email: false,
+	      zendesk: false,
+        client_id: clientId,
+        sessionid: '',
+        username: `WHATSAPP - {{${number}}}`,
+      };
+      logger.info(`👋 Primeira mensagem recebida. Template: ${template} Memoria_Saudacao: ${memory_saudacao}`);
+    } else {
+      const temperature = typeof frontend?.temperature === 'string' ? data.temperature : '0.2';
+      template = 'template_contexto';
+      payload = {
+        query: message,
+        memory: '{}',
+        searchdocs: true,
+        temperature,
+        template,
+        client_id: clientId,
+        email: false,
+        zendesk: false,
+        sessionid,
+        username: `WHATSAPP - {{${number}}}`,
+        cl: '1',
+        engine: 'azure',
+      };
+      logger.info(`💬 Mensagem de sequência. Template: ${template}  Temperatura: ${temperature}`);
+    }
+
+    const askUrl = `${process.env.API_BASE_URL}/api/ai/ask`;
+    logger.info(`📡 Enviando para: ${askUrl}`);
+    logger.info(`📦 Payload:`, JSON.stringify(payload));
+    
 
     const askResponse = await axios.post(askUrl, payload, {
       headers: { Authorization: `Bearer ${token_api}` },
