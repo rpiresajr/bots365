@@ -23,9 +23,9 @@ let token_api;
 
 
 async function getFrontEnd(token_api) {
-
+  logger.info(`Buscando dados frontEnd ... ${process.env.API_BASE_URL}/api/workspace usando o token: ${token_api}`);
   const res = await fetch(`${process.env.API_BASE_URL}/api/workspace`, {
-    method: 'POST',
+    method: 'GET',
     headers: { 'Content-Type': 'application/json',
                'Authorization': `Bearer ${token_api}` }
   });
@@ -36,7 +36,7 @@ async function getFrontEnd(token_api) {
   }
 
   const data = await res.json().catch(() => ({}));
-  logger.info("retornando ....");
+
   logger.info(data);
   const frontend = data?.frontend ?? null;
   if (!frontend) throw new Error('Resposta não contém o objeto frontend.');
@@ -73,7 +73,7 @@ async function getToken() {
 app.use(bodyParser.json());
 
 async function sendWhatsappMessage(number, instance, text) {
-  logger.info(`📨 Enviando mensagem para ${number}: "${text}"`);
+  logger.info(`📨 Enviando mensagem para ${number}: "${text}".   ${process.env.EVOLUTION_BASE_URL}/message/sendText/${instance}`);
   try {
     const response = await axios.post(
       `${process.env.EVOLUTION_BASE_URL}/message/sendText/${instance}`,
@@ -303,18 +303,18 @@ app.use(async (req, res, next) => {
 
     if (isFirstMessage) {
 
-      const memory_saudacao = typeof frontend?.memory_saudacao === 'string' ? data.memory_saudacao : 'Você é um chatbot, conversando como um humano, de forma amigável. Nunca coloque a frase de saudação em negrito.';
+      const memory_saudacao = typeof frontend?.memory_saudacao === 'string' ? frontend.memory_saudacao : 'Você é um chatbot, conversando como um humano, de forma amigável. Nunca coloque a frase de saudação em negrito.';
 
       template = 'template_saudacao';
       payload = {
         memory: JSON.stringify({
           role: 'system',
           content:
-            memory_saudacao,
+            memory_saudacao
         }),
         query: message,
         searchdocs: false,
-        temperature: 0.9,
+        temperature: '0.9',
         template,
 	      email: false,
 	      zendesk: false,
@@ -324,7 +324,7 @@ app.use(async (req, res, next) => {
       };
       logger.info(`👋 Primeira mensagem recebida. Template: ${template} Memoria_Saudacao: ${memory_saudacao}`);
     } else {
-      const temperature = typeof frontend?.temperature === 'string' ? data.temperature : '0.2';
+      const temperature = typeof frontend?.temperature === 'string' ? frontend.temperature : '0.2';
       template = 'template_contexto';
       payload = {
         query: message,
@@ -345,9 +345,11 @@ app.use(async (req, res, next) => {
 
     const askUrl = `${process.env.API_BASE_URL}/api/ai/ask`;
     logger.info(`📡 Enviando para: ${askUrl}`);
+    //logger.info(payload);
     logger.info(`📦 Payload:`, JSON.stringify(payload));
+    //logger.info(`📦 Payload:`, payload);
     
-
+    logger.info("Realizando o ask")
     const askResponse = await axios.post(askUrl, payload, {
       headers: { Authorization: `Bearer ${token_api}` },
     });
