@@ -63,7 +63,7 @@ async def start(update: Update, context):
     
 def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=None, user_name=None):
     global api_token, frontend_workspace
-    
+    getFrontend()
     if api_token is None:
         login_to_api()
         message = "Desculpe, não foi possível autenticar com o BOT365 no momento."
@@ -109,6 +109,9 @@ def search_api(input, habilitaContexto, email=False, zendesk=False, session_id=N
 
 def new_session(session_id, user_name, user_id):
     global frontend_workspace
+    
+    getFrontend()
+    
     session_id = get_or_create_session(user_id)
     msg1="Se apresente de maneira informal para o usuário falando sobre é um assistente virtual especializado da empresa e irá ajudá-lo"
     msg2='{"role": "system", "content": "Você é um representante comercial querendo vender um produto ou um serviço. Lembre todas as perguntas que o humano fizer"}'
@@ -119,9 +122,12 @@ def new_session(session_id, user_name, user_id):
         msg3="Sorry, an error occurred when querying the API"
     
     memoria=None
-    if frontend_workspace is not None:
-        memoria = frontend_workspace['memory_saudacao']
-        msg2=f'{"role": "system", "content": "${memoria}"}'
+    try:
+        if frontend_workspace is not None:
+            memoria = frontend_workspace['memory_saudacao']
+            msg2=f'{"role": "system", "content": "${memoria}"}'
+    except:
+        print ("Nao foi possivel buscar a memoria saudacao")
 
     body = {
         'query':
@@ -157,7 +163,7 @@ def getFrontend():
     global api_token, frontend_workspace
     try:
         headers = {'Authorization': f'Bearer {api_token}'}
-        response = requests.post(f'{API_WORKSPACE_URL}', headers=headers)
+        response = requests.get(f'{API_WORKSPACE_URL}', headers=headers)
         response.raise_for_status()
         frontend_workspace = response.json()['frontend']
         last_login_time = time.time()
